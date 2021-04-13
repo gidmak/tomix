@@ -116,6 +116,38 @@ namespace API.Controllers
             return NoContent();
         }
 
+        [HttpPut("unit/{id}")]
+        public async Task<IActionResult> UpdateProductUnit(int id, ProductUnitDTO productUnitDTO)
+        {
+            if(id != productUnitDTO.Id)
+            {
+                return BadRequest();
+            }
+
+            var product = await _context.Products.FindAsync(id);
+            if(product == null)
+            {
+                return NotFound();
+            }
+            product.Unit = productUnitDTO.Unit;
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch(DbUpdateConcurrencyException)
+            {
+                if(!ProductExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+            return NoContent();
+        }
+
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteProduct(int id)
         {
@@ -139,7 +171,8 @@ namespace API.Controllers
                 Id = product.Id,
                 Name = product.Name,
                 Price = product.Price,
-                IsAvailable = product.IsAvailable
+                IsAvailable = product.IsAvailable,
+                Unit = product.Unit
             };
     }
 }
