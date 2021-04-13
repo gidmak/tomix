@@ -1,10 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using API.Data;
 using API.DTOs;
 using API.Entities;
+using API.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,26 +20,6 @@ namespace API.Controllers
             _context = context;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProductDTO>>> GetProducts()
-        {
-            return await _context.Products
-                .Select(x => productsDTO(x))
-                .ToListAsync();
-        }
-
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ProductDTO>> GetProduct(int id)
-        {
-            var product = await _context.Products.FindAsync(id);   
-            if(product ==null)
-            {
-                return NotFound();
-            }
-
-            return productsDTO(product);
-        }
-
         [HttpPost]
         public async Task<ActionResult<ProductDTO>> CreateProduct(ProductDTO productDTO)
         {
@@ -52,23 +32,63 @@ namespace API.Controllers
 
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
-            
+
             return CreatedAtAction(
-                nameof(GetProduct), 
-                new {id = product.Id}, 
+                nameof(GetProduct),
+                new { id = product.Id },
                 productsDTO(product));
         }
+        
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<ProductDTO>>> GetProducts([FromQuery] ProductParams productParams)
+        {
+            var query = _context.Products.AsQueryable();
+        
+            if (!string.IsNullOrEmpty(productParams.Name))
+            {
+                query = query.Where(p => p.Name== productParams.Name);
+            }
 
+            if (productParams.Price.HasValue)
+            {
+                query = query.Where(p =>p.Price == productParams.Price);
+            }
+
+            if (productParams.IsAvailable.HasValue)
+            {
+                query = query.Where(p => p.IsAvailable == productParams.IsAvailable);
+            }
+            
+            return await query.Select(x => 
+                productsDTO(x))
+                .Skip((productParams.PageNumber - 1) * productParams.PageSize)
+                .Take(productParams.PageSize)
+                .ToListAsync();
+        }
+        
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ProductDTO>> GetProduct(int id)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                return NotFound();
+            }
+
+            return productsDTO(product);
+        }
+
+        
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, ProductDTO productDTO)
         {
-            if(id!=productDTO.Id)
+            if (id != productDTO.Id)
             {
                 return BadRequest();
             }
 
             var product = await _context.Products.FindAsync(id);
-            if(product ==null)
+            if (product == null)
             {
                 return NotFound();
             }
@@ -81,15 +101,15 @@ namespace API.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch(DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException)
             {
-                if(!ProductExists(id))
+                if (!ProductExists(id))
                 {
                     return NotFound();
                 }
                 else
                 {
-                    throw;  
+                    throw;
                 }
             }
 
@@ -100,7 +120,7 @@ namespace API.Controllers
         public async Task<ActionResult> DeleteProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
-            if(product == null)
+            if (product == null)
             {
                 return NotFound();
             }
@@ -112,7 +132,7 @@ namespace API.Controllers
 
         private bool ProductExists(int id) =>
             _context.Products.Any(e => e.Id == id);
-        
+
         private static ProductDTO productsDTO(Product product) =>
             new ProductDTO
             {
